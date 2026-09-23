@@ -1,5 +1,9 @@
 import streamlit as st
 
+# [TAMBAHAN UNTUKMU]: Import fungsi Caesar dari folder algorithm
+# Pastikan nama file di dalam folder algorithm adalah caesar.py
+from algorithm.caesar import caesar_encrypt, caesar_decrypt
+
 # Konfigurasi Halaman
 st.set_page_config(
     page_title="Aplikasi Kriptografi",
@@ -13,7 +17,7 @@ menu = st.sidebar.selectbox(
     "Pilih Menu:",
     (
         "Beranda / Home",
-        "1. Algoritma Klasik 1",
+        "1. Algoritma Klasik 1 (Caesar Cipher)",
         "2. Algoritma Klasik 2",
         "3. Algoritma Modern 1",
         "4. Algoritma Modern 2",
@@ -25,22 +29,71 @@ menu = st.sidebar.selectbox(
 if menu == "Beranda / Home":
     st.title("Aplikasi Enkripsi & Dekripsi Kriptografi")
     st.markdown("""
-    Selamat datang di aplikasi web tugas kelompok mata kuliah Kriptografi[cite: 1].
+    Selamat datang di aplikasi web tugas kelompok mata kuliah Kriptografi.
     
     ### Fitur Aplikasi:
-    - **Menu 1 & 2:** Algoritma Kriptografi Klasik[cite: 1]
-    - **Menu 3 & 4:** Algoritma Kriptografi Modern[cite: 1]
-    - **Menu 5:** Super Enkripsi (Gabungan 4 Algoritma)[cite: 1]
-    - **Visualisasi Proses:** Menampilkan tahapan detail proses enkripsi & dekripsi[cite: 1].
+    - **Menu 1 & 2:** Algoritma Kriptografi Klasik
+    - **Menu 3 & 4:** Algoritma Kriptografi Modern
+    - **Menu 5:** Super Enkripsi (Gabungan 4 Algoritma)
+    - **Visualisasi Proses:** Menampilkan tahapan detail proses enkripsi & dekripsi.
     
     *Silakan pilih menu di sebelah kiri untuk mulai menggunakan aplikasi.*
     """)
     
     st.info("💡 Jangan lupa untuk memperbarui informasi anggota kelompok di file README.md.")
 
-elif menu == "1. Algoritma Klasik 1":
-    st.header("Menu 1: Algoritma Klasik 1")
-    st.write("implementasikan kode enkripsi/dekripsi klasik pertama di sini.")
+elif menu == "1. Algoritma Klasik 1 (Caesar Cipher)":
+    st.header("Menu 1: Caesar Cipher")
+    st.write("Algoritma substitusi klasik yang menggeser posisi huruf pada alfabet. Algoritma ini sangat rentan terhadap serangan Brute Force karena hanya memiliki 25 kemungkinan kunci.")
+
+    # Form Input dari user
+    teks = st.text_area("Masukkan Teks (Plaintext / Ciphertext):", height=100)
+    shift = st.number_input("Masukkan Kunci Pergeseran (Shift / N):", min_value=1, max_value=25, value=3)
+
+    # Membagi layout menjadi 3 kolom untuk tombol Encrypt, Decrypt, dan Brute Force
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True):
+            if teks:
+                hasil, langkah = caesar_encrypt(teks, shift)
+                st.success("Teks Berhasil Dienkripsi!")
+                st.text_input("Hasil Ciphertext:", value=hasil, disabled=True)
+
+                with st.expander("Tampilkan Langkah-langkah Enkripsi"):
+                    for step in langkah:
+                        st.write(f"- {step}")
+            else:
+                st.warning("Silakan masukkan teks terlebih dahulu.")
+
+    with col2:
+        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True):
+            if teks:
+                hasil, langkah = caesar_decrypt(teks, shift)
+                st.success("Teks Berhasil Didekripsi!")
+                st.text_input("Hasil Plaintext:", value=hasil, disabled=True)
+
+                with st.expander("Tampilkan Langkah-langkah Dekripsi"):
+                    for step in langkah:
+                        st.write(f"- {step}")
+            else:
+                st.warning("Silakan masukkan teks terlebih dahulu.")
+
+    with col3:
+        if st.button("🔍 Brute Force", use_container_width=True, type="primary"):
+            if teks:
+                st.warning("Menjalankan serangan Brute Force (menguji 25 kemungkinan kunci)...")
+
+                # Menggunakan expander yang langsung terbuka agar hasilnya rapi
+                with st.expander("Lihat Hasil Brute Force (Shift 1 - 25)", expanded=True):
+                    # Looping dari pergeseran 1 sampai 25
+                    for i in range(1, 26):
+                        # Kita abaikan variabel 'langkah' menggunakan underscore (_)
+                        # karena untuk brute force kita hanya butuh hasil akhirnya saja
+                        hasil_brute, _ = caesar_decrypt(teks, i)
+                        st.markdown(f"**Key {i}:** {hasil_brute}")
+            else:
+                st.warning("Silakan masukkan ciphertext terlebih dahulu.")
 
 elif menu == "2. Algoritma Klasik 2":
     st.header("Menu 2: Algoritma Klasik 2")

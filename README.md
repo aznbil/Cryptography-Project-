@@ -24,4 +24,8 @@ Aplikasi web berbasis Python menggunakan **Streamlit** untuk melakukan enkripsi 
    ```bash
    git clone https://github.com/<username>/Cryptography-Project-.git 
    cd Cryptography-Project-
-   streamlit run app.py 
+   ```
+2. **Run the app**
+   ```bash
+   streamlit run app.py
+   ```

@@ -2,7 +2,7 @@ import streamlit as st
 
 # [TAMBAHAN UNTUKMU]: Import fungsi Caesar dari folder algorithm
 # Pastikan nama file di dalam folder algorithm adalah caesar.py
-from algorithm.caesar import caesar_encrypt, caesar_decrypt
+from algorithm.algoritma_caesar import caesar_encrypt, caesar_decrypt
 
 # Konfigurasi Halaman
 st.set_page_config(

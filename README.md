@@ -14,8 +14,8 @@ Aplikasi web berbasis Python menggunakan **Streamlit** untuk melakukan enkripsi 
 ## Anggota Kelompok
 1. [Karina Sulistiya W] - [123240237]
 2. [Aziz Nabil Putra D] - [123240239]
-3. [M. Dimas Setiaji] - [12324240]
-4. [M. Ahsan R.S] - [123242246]
+3. [M. Dimas Setiaji] - [123240240]
+4. [M. Ahsan R.S] - [123240246]
 ---
 
 ## Cara Instalasi & Menjalankan Program

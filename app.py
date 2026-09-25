@@ -1,7 +1,7 @@
 import streamlit as st
 import importlib
 
-# Pastikan nama file di dalam folder algorithm adalah algoritma_caesar.py
+# Import algoritma caesar
 from algorithm.algoritma_caesar import caesar_encrypt, caesar_decrypt
 
 # Import fungsi Vigenere menggunakan importlib (karena nama file mengandung tanda -)

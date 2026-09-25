@@ -23,7 +23,7 @@ class AESCipher:
                 raise ValueError("Key harus 16, 24, atau 32 byte")
             self.key = key
     
-    def encrypt(self, plaintext: str) -> str:
+    def aes_encrypt(self, plaintext: str) -> str:
         """
         Enkripsi plaintext menggunakan AES
         
@@ -49,7 +49,7 @@ class AESCipher:
         encrypted_data = iv + ciphertext
         return base64.b64encode(encrypted_data).decode()
     
-    def decrypt(self, encrypted_text: str) -> str:
+    def aes_decrypt(self, encrypted_text: str) -> str:
         """
         Dekrips ciphertext yang dienkripsi dengan AES
         

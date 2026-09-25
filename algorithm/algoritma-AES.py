@@ -2,152 +2,94 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 import base64
-import os
 
-class AESCipher:
-    def __init__(self, key: bytes = None):
-        """
-        Inisialisasi cipher AES
-        
-        Args:
-            key: Key AES (16, 24, atau 32 byte untuk AES-128, AES-192, AES-256)
-                 Jika None, akan generate key random 32 byte (AES-256)
-        """
-        if key is None:
-            self.key = get_random_bytes(32)  # Generate 256-bit key
-        else:
-            if len(key) not in [16, 24, 32]:
-                raise ValueError("Key harus 16, 24, atau 32 byte")
-            self.key = key
-    
-    def encrypt(self, plaintext: str) -> str:
-        """
-        Enkripsi plaintext menggunakan AES
-        
-        Args:
-            plaintext: Teks yang ingin dienkripsi
-            
-        Returns:
-            String base64 dari (IV + ciphertext)
-        """
-        # Generate random IV (Initialization Vector)
-        iv = get_random_bytes(16)
-        
-        # Buat cipher dengan mode CBC
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        
-        # Padding plaintext agar kelipatan 16 byte
-        padded_plaintext = pad(plaintext.encode(), AES.block_size)
-        
-        # Enkripsi
-        ciphertext = cipher.encrypt(padded_plaintext)
-        
-        # Gabung IV + ciphertext dan encode ke base64
-        encrypted_data = iv + ciphertext
-        return base64.b64encode(encrypted_data).decode()
-    
-    def decrypt(self, encrypted_text: str) -> str:
-        """
-        Dekrips ciphertext yang dienkripsi dengan AES
-        
-        Args:
-            encrypted_text: String base64 hasil enkripsi
-            
-        Returns:
-            Plaintext original
-        """
-        try:
-            # Decode dari base64
-            encrypted_data = base64.b64decode(encrypted_text)
-            
-            # Pisahkan IV dan ciphertext
-            # IV adalah 16 byte pertama
-            iv = encrypted_data[:16]
-            ciphertext = encrypted_data[16:]
-            
-            # Buat cipher dengan IV yang sama
-            cipher = AES.new(self.key, AES.MODE_CBC, iv)
-            
-            # Dekrips
-            padded_plaintext = cipher.decrypt(ciphertext)
-            
-            # Hapus padding
-            plaintext = unpad(padded_plaintext, AES.block_size)
-            
-            return plaintext.decode()
-        except ValueError as e:
-            raise ValueError(f"Dekrips gagal: {str(e)}")
+def prepare_key(key: str) -> bytes:
+    """
+    Menyesuaikan panjang key menjadi 16, 24, atau 32 byte.
+    """
+    key_bytes = key.encode('utf-8')
+    if len(key_bytes) <= 16:
+        return key_bytes.ljust(16, b'\0')
+    elif len(key_bytes) <= 24:
+        return key_bytes.ljust(24, b'\0')
+    else:
+        return key_bytes[:32].ljust(32, b'\0')
 
 
-# ==================== CONTOH PENGGUNAAN ====================
-
-def main():
-    print("=" * 50)
-    print("AES Encryption & Decryption Demo")
-    print("=" * 50)
+def aes_encrypt(text: str, key: str):
+    """
+    Mengenkripsi teks menggunakan AES (Mode CBC + PKCS7 Padding).
     
-    # Method 1: Generate key otomatis (AES-256)
-    print("\n[Method 1] Menggunakan key yang di-generate")
-    cipher1 = AESCipher()
-    print(f"Key (hex): {cipher1.key.hex()}")
+    Returns:
+        tuple: (ciphertext_b64, steps)
+    """
+    if not text:
+        raise ValueError("Teks tidak boleh kosong.")
+    if not key:
+        raise ValueError("Kunci tidak boleh kosong.")
+        
+    key_bytes = prepare_key(key)
+    iv = get_random_bytes(16)
+    cipher = AES.new(key_bytes, AES.MODE_CBC, iv)
     
-    plaintext = "Halo, ini adalah pesan rahasia!"
-    print(f"\nPlaintext: {plaintext}")
+    text_bytes = text.encode('utf-8')
+    padded_bytes = pad(text_bytes, AES.block_size)
+    ciphertext_bytes = cipher.encrypt(padded_bytes)
     
-    # Enkripsi
-    encrypted = cipher1.encrypt(plaintext)
-    print(f"Encrypted: {encrypted}")
+    full_encrypted = iv + ciphertext_bytes
+    ciphertext_b64 = base64.b64encode(full_encrypted).decode('utf-8')
     
-    # Dekrips
-    decrypted = cipher1.decrypt(encrypted)
-    print(f"Decrypted: {decrypted}")
-    
-    # Verifikasi
-    print(f"Verifikasi: {plaintext == decrypted} ✓" if plaintext == decrypted else "✗")
-    
-    # Method 2: Menggunakan key yang sudah ditentukan
-    print("\n" + "=" * 50)
-    print("[Method 2] Menggunakan key yang sudah ditentukan")
-    
-    # Key bisa dari string atau bytes
-    key_str = "MySecretKey1234567890123456789!"  # 32 karakter = 32 byte
-    key = key_str.encode()  # Convert ke bytes
-    print(f"Key: {key_str}")
-    
-    cipher2 = AESCipher(key)
-    
-    plaintext2 = "Pesan penting dari Ahsan"
-    print(f"\nPlaintext: {plaintext2}")
-    
-    encrypted2 = cipher2.encrypt(plaintext2)
-    print(f"Encrypted: {encrypted2}")
-    
-    decrypted2 = cipher2.decrypt(encrypted2)
-    print(f"Decrypted: {decrypted2}")
-    
-    print(f"Verifikasi: {plaintext2 == decrypted2} ✓" if plaintext2 == decrypted2 else "✗")
-    
-    # Method 3: Enkripsi banyak pesan dengan key yang sama
-    print("\n" + "=" * 50)
-    print("[Method 3] Enkripsi multiple messages")
-    
-    messages = [
-        "Pesan pertama",
-        "Pesan kedua",
-        "Pesan ketiga"
+    steps = [
+        f"Kunci Asli: '{key}' ({len(key)} karakter)",
+        f"Kunci Bytes (Hex): {key_bytes.hex()} ({len(key_bytes)} bytes / {len(key_bytes)*8}-bit AES)",
+        f"IV (Initialization Vector Hex): {iv.hex()}",
+        f"Plaintext (Hex): {text_bytes.hex()}",
+        f"Padded Plaintext PKCS7 (Hex): {padded_bytes.hex()} ({len(padded_bytes)} bytes)",
+        f"Ciphertext Raw (Hex): {ciphertext_bytes.hex()}",
+        f"IV + Ciphertext Raw (Hex): {full_encrypted.hex()}",
+        f"Hasil Akhir Base64: {ciphertext_b64}"
     ]
     
-    encrypted_messages = []
-    for msg in messages:
-        encrypted = cipher2.encrypt(msg)
-        encrypted_messages.append(encrypted)
-        print(f"'{msg}' -> {encrypted[:50]}...")
+    return ciphertext_b64, steps
+
+
+def aes_decrypt(encrypted_b64: str, key: str):
+    """
+    Mendekripsi Base64 ciphertext menggunakan AES (Mode CBC).
     
-    print("\nDekrips semua pesan:")
-    for i, enc in enumerate(encrypted_messages):
-        dec = cipher2.decrypt(enc)
-        print(f"  {i+1}. {dec}")
-
-
-if __name__ == "__main__":
-    main()
+    Returns:
+        tuple: (plaintext, steps)
+    """
+    if not encrypted_b64:
+        raise ValueError("Ciphertext tidak boleh kosong.")
+    if not key:
+        raise ValueError("Kunci tidak boleh kosong.")
+        
+    key_bytes = prepare_key(key)
+    
+    try:
+        full_encrypted = base64.b64decode(encrypted_b64)
+        if len(full_encrypted) < 32:
+            raise ValueError("Data terenkripsi terlalu pendek / invalid.")
+            
+        iv = full_encrypted[:16]
+        ciphertext_bytes = full_encrypted[16:]
+        
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv)
+        padded_plaintext = cipher.decrypt(ciphertext_bytes)
+        plaintext_bytes = unpad(padded_plaintext, AES.block_size)
+        plaintext = plaintext_bytes.decode('utf-8')
+        
+        steps = [
+            f"Kunci Bytes (Hex): {key_bytes.hex()} ({len(key_bytes)} bytes)",
+            f"Decoded Base64 (Hex): {full_encrypted.hex()}",
+            f"IV Terekstraksi (Hex): {iv.hex()}",
+            f"Ciphertext Raw (Hex): {ciphertext_bytes.hex()}",
+            f"Padded Decrypted Bytes (Hex): {padded_plaintext.hex()}",
+            f"Unpadded Plaintext Bytes (Hex): {plaintext_bytes.hex()}",
+            f"Hasil Dekripsi (Plaintext): '{plaintext}'"
+        ]
+        
+        return plaintext, steps
+    except Exception as e:
+        raise ValueError(f"Dekripsi AES gagal! Pastikan Kunci dan Ciphertext Base64 valid. Error: {str(e)}")

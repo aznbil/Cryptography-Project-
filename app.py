@@ -1,8 +1,13 @@
 import streamlit as st
+import importlib
 
-# [TAMBAHAN UNTUKMU]: Import fungsi Caesar dari folder algorithm
-# Pastikan nama file di dalam folder algorithm adalah caesar.py
+# Pastikan nama file di dalam folder algorithm adalah algoritma_caesar.py
 from algorithm.algoritma_caesar import caesar_encrypt, caesar_decrypt
+
+# Import fungsi Vigenere menggunakan importlib (karena nama file mengandung tanda -)
+vigenere_module = importlib.import_module("algorithm.algoritma-Vigenere")
+vigenere_encrypt = vigenere_module.vigenere_encrypt
+vigenere_decrypt = vigenere_module.vigenere_decrypt
 
 # Konfigurasi Halaman
 st.set_page_config(
@@ -18,7 +23,7 @@ menu = st.sidebar.selectbox(
     (
         "Beranda / Home",
         "1. Algoritma Klasik 1 (Caesar Cipher)",
-        "2. Algoritma Klasik 2",
+        "2. Algoritma Klasik 2 (Vigenère Cipher)",
         "3. Algoritma Modern 1",
         "4. Algoritma Modern 2",
         "5. Super Enkripsi (Gabungan)"
@@ -95,9 +100,44 @@ elif menu == "1. Algoritma Klasik 1 (Caesar Cipher)":
             else:
                 st.warning("Silakan masukkan ciphertext terlebih dahulu.")
 
-elif menu == "2. Algoritma Klasik 2":
-    st.header("Menu 2: Algoritma Klasik 2")
-    st.write("implementasikan kode enkripsi/dekripsi klasik kedua di sini.")
+elif menu == "2. Algoritma Klasik 2 (Vigenère Cipher)":
+    st.header("Menu 2: Vigenère Cipher")
+    st.write("Algoritma substitusi polialfabetik yang menggunakan kata kunci (*key*) untuk menggeser karakter. Setiap huruf pada pesan dienkripsi dengan pergeseran yang berbeda sesuai huruf kunci yang bersangkutan.")
+
+    teks_vigenere = st.text_area("Masukkan Teks (Plaintext / Ciphertext):", height=100, key="vigenere_text")
+    kunci_vigenere = st.text_input("Masukkan Kata Kunci (Key):", value="KEY", key="vigenere_key")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True, key="vigenere_enc_btn"):
+            if teks_vigenere and kunci_vigenere:
+                try:
+                    hasil, langkah = vigenere_encrypt(teks_vigenere, kunci_vigenere)
+                    st.success("Teks Berhasil Dienkripsi!")
+                    st.text_input("Hasil Ciphertext:", value=hasil, disabled=True, key="vigenere_res_enc")
+
+                    with st.expander("Tampilkan Langkah-langkah Enkripsi", expanded=True):
+                        st.dataframe(langkah, use_container_width=True)
+                except ValueError as e:
+                    st.error(str(e))
+            else:
+                st.warning("Silakan masukkan teks dan kata kunci terlebih dahulu.")
+
+    with col2:
+        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True, key="vigenere_dec_btn"):
+            if teks_vigenere and kunci_vigenere:
+                try:
+                    hasil, langkah = vigenere_decrypt(teks_vigenere, kunci_vigenere)
+                    st.success("Teks Berhasil Didekripsi!")
+                    st.text_input("Hasil Plaintext:", value=hasil, disabled=True, key="vigenere_res_dec")
+
+                    with st.expander("Tampilkan Langkah-langkah Dekripsi", expanded=True):
+                        st.dataframe(langkah, use_container_width=True)
+                except ValueError as e:
+                    st.error(str(e))
+            else:
+                st.warning("Silakan masukkan teks dan kata kunci terlebih dahulu.")
 
 elif menu == "3. Algoritma Modern 1":
     st.header("Menu 3: Algoritma Modern 1")

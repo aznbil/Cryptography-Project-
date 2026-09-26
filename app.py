@@ -13,8 +13,7 @@ vigenere_decrypt = vigenere_module.vigenere_decrypt
 # aes_encrypt = AESCipher.aes_encrypt
 # aes_decrypt = AESCipher.aes_decrypt
 aes_module = importlib.import_module("algorithm.algoritma-AES")
-aes_encrypt = aes_module.AESCipher().aes_encrypt
-aes_decrypt = aes_module.AESCipher().aes_decrypt
+AESCipher = aes_module.AESCipher
 
 
 # Import fungsi ChaCha20 menggunakan importlib (karena nama file mengandung tanda -)
@@ -153,45 +152,190 @@ elif menu == "2. Algoritma Klasik 2 (Vigenère Cipher)":
                 st.warning("Silakan masukkan teks dan kata kunci terlebih dahulu.")
 
 elif menu == "3. Algoritma Modern 1 (AES)":
-    st.header("Menu 3: AES (Advanced Encryption Standard)")
-    st.write("Algoritma simetris simetri block cipher modern tingkat tinggi menggunakan mode CBC (Cipher Block Chaining) dan padding PKCS7. Menghasilkan ciphertext terenkripsi aman dalam format Base64.")
 
-    teks_aes = st.text_area("Masukkan Teks (Plaintext / Base64 Ciphertext):", height=100, key="aes_text")
-    kunci_aes = st.text_input("Masukkan Kunci (Key):", value="MySecretKey123456", help="Kunci akan otomatis disesuaikan ukurannya ke 16, 24, atau 32 bytes.", key="aes_key")
+    st.header("Menu 3: AES (Advanced Encryption Standard)")
+
+    st.write(
+        "Algoritma simetris block cipher modern menggunakan "
+        "mode CBC (Cipher Block Chaining) dan padding PKCS7."
+    )
+
+    # =========================
+    # INPUT AES
+    # =========================
+
+    teks_aes = st.text_area(
+        "Masukkan Teks (Plaintext / Base64 Ciphertext):",
+        height=100,
+        key="aes_text"
+    )
+
+    kunci_aes = st.text_input(
+        "Masukkan Kunci AES:",
+        type="password",
+        help="Kunci harus memiliki panjang 16, 24, atau 32 byte.",
+        key="aes_key"
+    )
 
     col1, col2 = st.columns(2)
 
-    with col1:
-        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True, key="aes_enc_btn"):
-            if teks_aes and kunci_aes:
-                try:
-                    hasil, langkah = aes_encrypt(teks_aes, kunci_aes)
-                    st.success("Teks Berhasil Dienkripsi dengan AES CBC!")
-                    st.text_area("Hasil Ciphertext (Base64):", value=hasil, height=100, key="aes_res_enc")
+    # =========================
+    # ENCRYPT
+    # =========================
 
-                    with st.expander("Tampilkan Langkah-langkah & Detail Kompleksitas AES", expanded=True):
-                        for step in langkah:
-                            st.write(f"- {step}")
+    with col1:
+
+        if st.button(
+            "🔒 Encrypt (Enkripsi)",
+            use_container_width=True,
+            key="aes_enc_btn"
+        ):
+
+            if teks_aes and kunci_aes:
+
+                try:
+
+                    # Convert key string -> bytes
+                    key_bytes = kunci_aes.encode("utf-8")
+
+                    # Validasi panjang key
+                    if len(key_bytes) not in [16, 24, 32]:
+
+                        st.error(
+                            f"Key harus 16, 24, atau 32 byte. "
+                            f"Key kamu sekarang {len(key_bytes)} byte."
+                        )
+
+                    else:
+
+                        # Buat object AES menggunakan key dari user
+                        cipher = AESCipher(key_bytes)
+
+                        # Encrypt
+                        hasil, langkah = cipher.aes_encrypt(
+                            teks_aes
+                        )
+
+                        st.success(
+                            "Teks berhasil dienkripsi dengan AES CBC!"
+                        )
+
+                        # =========================
+                        # OUTPUT CIPHERTEXT
+                        # =========================
+
+                        st.text_area(
+                            "Hasil Ciphertext (Base64):",
+                            value=hasil,
+                            height=100,
+                            key="aes_res_enc"
+                        )
+
+                        # =========================
+                        # OUTPUT LANGKAH
+                        # =========================
+
+                        with st.expander(
+                            "🔍 Tampilkan Langkah-Langkah Enkripsi AES",
+                            expanded=True
+                        ):
+
+                            for i, step in enumerate(langkah, start=1):
+
+                                st.write(
+                                    f"**Langkah {i}:** {step}"
+                                )
+
                 except Exception as e:
-                    st.error(f"Terjadi kesalahan: {str(e)}")
+
+                    st.error(
+                        f"Terjadi kesalahan: {str(e)}"
+                    )
+
             else:
-                st.warning("Silakan masukkan teks dan kunci terlebih dahulu.")
+
+                st.warning(
+                    "Silakan masukkan teks dan kunci terlebih dahulu."
+                )
+
+    # =========================
+    # DECRYPT
+    # =========================
 
     with col2:
-        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True, key="aes_dec_btn"):
-            if teks_aes and kunci_aes:
-                try:
-                    hasil, langkah = aes_decrypt(teks_aes, kunci_aes)
-                    st.success("Teks Berhasil Didekripsi dengan AES CBC!")
-                    st.text_area("Hasil Plaintext:", value=hasil, height=100, key="aes_res_dec")
 
-                    with st.expander("Tampilkan Langkah-langkah & Detail Dekripsi AES", expanded=True):
-                        for step in langkah:
-                            st.write(f"- {step}")
+        if st.button(
+            "🔓 Decrypt (Dekripsi)",
+            use_container_width=True,
+            key="aes_dec_btn"
+        ):
+
+            if teks_aes and kunci_aes:
+
+                try:
+
+                    # Convert key string -> bytes
+                    key_bytes = kunci_aes.encode("utf-8")
+
+                    # Validasi panjang key
+                    if len(key_bytes) not in [16, 24, 32]:
+
+                        st.error(
+                            f"Key harus 16, 24, atau 32 byte. "
+                            f"Key kamu sekarang {len(key_bytes)} byte."
+                        )
+
+                    else:
+
+                        # Buat object AES
+                        cipher = AESCipher(key_bytes)
+
+                        # Decrypt
+                        hasil, langkah = cipher.aes_decrypt(
+                            teks_aes
+                        )
+
+                        st.success(
+                            "Teks berhasil didekripsi dengan AES CBC!"
+                        )
+
+                        # =========================
+                        # OUTPUT PLAINTEXT
+                        # =========================
+
+                        st.text_area(
+                            "Hasil Plaintext:",
+                            value=hasil,
+                            height=100,
+                            key="aes_res_dec"
+                        )
+
+                        # =========================
+                        # OUTPUT LANGKAH
+                        # =========================
+
+                        with st.expander(
+                            "🔍 Tampilkan Langkah-Langkah Dekripsi AES",
+                            expanded=True
+                        ):
+
+                            for i, step in enumerate(langkah, start=1):
+
+                                st.write(
+                                    f"**Langkah {i}:** {step}"
+                                )
+
                 except Exception as e:
-                    st.error(f"Terjadi kesalahan: {str(e)}")
+
+                    st.error(
+                        f"Terjadi kesalahan: {str(e)}"
+                    )
+
             else:
-                st.warning("Silakan masukkan ciphertext Base64 dan kunci terlebih dahulu.")
+
+                st.warning(
+                    "Silakan masukkan ciphertext Base64 dan kunci terlebih dahulu."
+                )
 
 elif menu == "4. Algoritma Modern 2 (ChaCha20)":
     st.header("Menu 4: ChaCha20 Stream Cipher")
@@ -271,12 +415,15 @@ elif menu == "5. Super Enkripsi (Gabungan)":
         if st.button("🔒 Super Encrypt (Enkripsi 4 Tahap)", use_container_width=True, type="primary", key="super_enc_btn"):
             if teks_super:
                 try:
+                    aes_cipher = AESCipher(
+                    kunci_aes_super.encode("utf-8")
+                    )
                     # 1. Caesar Encrypt
                     t1, _ = caesar_encrypt(teks_super, shift_super)
                     # 2. Vigenere Encrypt
                     t2, _ = vigenere_encrypt(t1, kunci_vigenere_super)
                     # 3. AES Encrypt
-                    t3, _ = aes_encrypt(t2, kunci_aes_super)
+                    t3, _ = aes_cipher.aes_encrypt(t2)
                     # 4. ChaCha20 Encrypt
                     final_ciphertext, _ = chacha20_encrypt(t3, kunci_chacha_super, nonce_chacha_super, int(counter_chacha_super))
 
@@ -298,10 +445,13 @@ elif menu == "5. Super Enkripsi (Gabungan)":
         if st.button("🔓 Super Decrypt (Dekripsi 4 Tahap)", use_container_width=True, key="super_dec_btn"):
             if teks_super:
                 try:
+                    aes_cipher = AESCipher(
+                    kunci_aes_super.encode("utf-8")
+                    )
                     # 1. ChaCha20 Decrypt
                     d3, _ = chacha20_decrypt(teks_super, kunci_chacha_super, nonce_chacha_super, int(counter_chacha_super))
                     # 2. AES Decrypt
-                    d2, _ = aes_decrypt(d3, kunci_aes_super)
+                    d2, _ =  aes_cipher.aes_decrypt(d3)
                     # 3. Vigenere Decrypt
                     d1, _ = vigenere_decrypt(d2, kunci_vigenere_super)
                     # 4. Caesar Decrypt

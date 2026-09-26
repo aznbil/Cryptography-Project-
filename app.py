@@ -10,9 +10,12 @@ vigenere_encrypt = vigenere_module.vigenere_encrypt
 vigenere_decrypt = vigenere_module.vigenere_decrypt
 
 # Import fungsi AES menggunakan importlib (karena nama file mengandung tanda -)
+# aes_encrypt = AESCipher.aes_encrypt
+# aes_decrypt = AESCipher.aes_decrypt
 aes_module = importlib.import_module("algorithm.algoritma-AES")
-aes_encrypt = aes_module.aes_encrypt
-aes_decrypt = aes_module.aes_decrypt
+aes_encrypt = aes_module.AESCipher().aes_encrypt
+aes_decrypt = aes_module.AESCipher().aes_decrypt
+
 
 # Import fungsi ChaCha20 menggunakan importlib (karena nama file mengandung tanda -)
 chacha_module = importlib.import_module("algorithm.algoritma-Chacha20")

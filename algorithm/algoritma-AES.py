@@ -84,73 +84,73 @@ class AESCipher:
 
 # ==================== CONTOH PENGGUNAAN ====================
 
-def main():
-    print("=" * 50)
-    print("AES Encryption & Decryption Demo")
-    print("=" * 50)
+# def main():
+#     print("=" * 50)
+#     print("AES Encryption & Decryption Demo")
+#     print("=" * 50)
     
-    # Method 1: Generate key otomatis (AES-256)
-    print("\n[Method 1] Menggunakan key yang di-generate")
-    cipher1 = AESCipher()
-    print(f"Key (hex): {cipher1.key.hex()}")
+#     # Method 1: Generate key otomatis (AES-256)
+#     print("\n[Method 1] Menggunakan key yang di-generate")
+#     cipher1 = AESCipher()
+#     print(f"Key (hex): {cipher1.key.hex()}")
     
-    plaintext = "Halo, ini adalah pesan rahasia!"
-    print(f"\nPlaintext: {plaintext}")
+#     plaintext = "Halo, ini adalah pesan rahasia!"
+#     print(f"\nPlaintext: {plaintext}")
     
-    # Enkripsi
-    encrypted = cipher1.encrypt(plaintext)
-    print(f"Encrypted: {encrypted}")
+#     # Enkripsi
+#     encrypted = cipher1.encrypt(plaintext)
+#     print(f"Encrypted: {encrypted}")
     
-    # Dekrips
-    decrypted = cipher1.decrypt(encrypted)
-    print(f"Decrypted: {decrypted}")
+#     # Dekrips
+#     decrypted = cipher1.decrypt(encrypted)
+#     print(f"Decrypted: {decrypted}")
     
-    # Verifikasi
-    print(f"Verifikasi: {plaintext == decrypted} ✓" if plaintext == decrypted else "✗")
+#     # Verifikasi
+#     print(f"Verifikasi: {plaintext == decrypted} ✓" if plaintext == decrypted else "✗")
     
-    # Method 2: Menggunakan key yang sudah ditentukan
-    print("\n" + "=" * 50)
-    print("[Method 2] Menggunakan key yang sudah ditentukan")
+#     # Method 2: Menggunakan key yang sudah ditentukan
+#     print("\n" + "=" * 50)
+#     print("[Method 2] Menggunakan key yang sudah ditentukan")
     
-    # Key bisa dari string atau bytes
-    key_str = "MySecretKey1234567890123456789!"  # 32 karakter = 32 byte
-    key = key_str.encode()  # Convert ke bytes
-    print(f"Key: {key_str}")
+#     # Key bisa dari string atau bytes
+#     key_str = "MySecretKey1234567890123456789!"  # 32 karakter = 32 byte
+#     key = key_str.encode()  # Convert ke bytes
+#     print(f"Key: {key_str}")
     
-    cipher2 = AESCipher(key)
+#     cipher2 = AESCipher(key)
     
-    plaintext2 = "Pesan penting dari Ahsan"
-    print(f"\nPlaintext: {plaintext2}")
+#     plaintext2 = "Pesan penting dari Ahsan"
+#     print(f"\nPlaintext: {plaintext2}")
     
-    encrypted2 = cipher2.encrypt(plaintext2)
-    print(f"Encrypted: {encrypted2}")
+#     encrypted2 = cipher2.encrypt(plaintext2)
+#     print(f"Encrypted: {encrypted2}")
     
-    decrypted2 = cipher2.decrypt(encrypted2)
-    print(f"Decrypted: {decrypted2}")
+#     decrypted2 = cipher2.decrypt(encrypted2)
+#     print(f"Decrypted: {decrypted2}")
     
-    print(f"Verifikasi: {plaintext2 == decrypted2} ✓" if plaintext2 == decrypted2 else "✗")
+#     print(f"Verifikasi: {plaintext2 == decrypted2} ✓" if plaintext2 == decrypted2 else "✗")
     
-    # Method 3: Enkripsi banyak pesan dengan key yang sama
-    print("\n" + "=" * 50)
-    print("[Method 3] Enkripsi multiple messages")
+#     # Method 3: Enkripsi banyak pesan dengan key yang sama
+#     print("\n" + "=" * 50)
+#     print("[Method 3] Enkripsi multiple messages")
     
-    messages = [
-        "Pesan pertama",
-        "Pesan kedua",
-        "Pesan ketiga"
-    ]
+#     messages = [
+#         "Pesan pertama",
+#         "Pesan kedua",
+#         "Pesan ketiga"
+#     ]
     
-    encrypted_messages = []
-    for msg in messages:
-        encrypted = cipher2.encrypt(msg)
-        encrypted_messages.append(encrypted)
-        print(f"'{msg}' -> {encrypted[:50]}...")
+#     encrypted_messages = []
+#     for msg in messages:
+#         encrypted = cipher2.encrypt(msg)
+#         encrypted_messages.append(encrypted)
+#         print(f"'{msg}' -> {encrypted[:50]}...")
     
-    print("\nDekrips semua pesan:")
-    for i, enc in enumerate(encrypted_messages):
-        dec = cipher2.decrypt(enc)
-        print(f"  {i+1}. {dec}")
+#     print("\nDekrips semua pesan:")
+#     for i, enc in enumerate(encrypted_messages):
+#         dec = cipher2.decrypt(enc)
+#         print(f"  {i+1}. {dec}")
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

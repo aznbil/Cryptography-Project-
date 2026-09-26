@@ -27,6 +27,18 @@ def save_result(key, result):
     )
 
 
+def parse_integer_input(label, value, minimum, maximum):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        st.error(f"{label} wajib diisi dengan bilangan bulat.")
+        return None
+    if not minimum <= parsed <= maximum:
+        st.error(f"{label} harus berada di antara {minimum} dan {maximum}.")
+        return None
+    return parsed
+
+
 def find_hex_step(steps, prefix):
     for step in steps:
         if isinstance(step, str) and step.startswith(prefix):
@@ -208,12 +220,23 @@ if menu == "🏠 Beranda":
 elif menu == "🔑 Caesar Cipher":
     st.header("🔑 Caesar Cipher")
     teks = st.text_area("Masukkan teks:", placeholder="HELLO WORLD")
-    shift = st.number_input("Shift:", 1, 25, 3)
+    shift_input = st.number_input(
+        "Shift:",
+        min_value=1,
+        max_value=25,
+        value=None,
+        step=1,
+        placeholder="Masukkan angka 1–25",
+    )
     encrypt_col, decrypt_col = st.columns(2)
     if encrypt_col.button("🔒 Enkripsi"):
-        save_result("caesar_encrypt_result", caesar_encrypt(teks, shift))
+        shift = parse_integer_input("Shift", shift_input, 1, 25)
+        if shift is not None:
+            save_result("caesar_encrypt_result", caesar_encrypt(teks, shift))
     if decrypt_col.button("🔓 Dekripsi"):
-        save_result("caesar_decrypt_result", caesar_decrypt(teks, shift))
+        shift = parse_integer_input("Shift", shift_input, 1, 25)
+        if shift is not None:
+            save_result("caesar_decrypt_result", caesar_decrypt(teks, shift))
 
     render_result(
         "caesar_encrypt_result",
@@ -229,12 +252,18 @@ elif menu == "🔑 Caesar Cipher":
 elif menu == "🔐 Vigenère Cipher":
     st.header("🔐 Vigenère Cipher")
     teks = st.text_area("Masukkan teks:", placeholder="HELLO")
-    kunci = st.text_input("Kata Kunci:", value="KEY")
+    kunci = st.text_input("Kata Kunci:", placeholder="Masukkan kunci Vigenère")
     encrypt_col, decrypt_col = st.columns(2)
     if encrypt_col.button("🔒 Enkripsi"):
-        save_result("vigenere_encrypt_result", vigenere_encrypt(teks, kunci))
+        try:
+            save_result("vigenere_encrypt_result", vigenere_encrypt(teks, kunci))
+        except ValueError as error:
+            st.error(str(error))
     if decrypt_col.button("🔓 Dekripsi"):
-        save_result("vigenere_decrypt_result", vigenere_decrypt(teks, kunci))
+        try:
+            save_result("vigenere_decrypt_result", vigenere_decrypt(teks, kunci))
+        except ValueError as error:
+            st.error(str(error))
 
     for operation in ("encrypt", "decrypt"):
         result_key = f"vigenere_{operation}_result"
@@ -253,14 +282,20 @@ elif menu == "🔐 Vigenère Cipher":
 elif menu == "⚙️ AES":
     st.header("⚙️ AES")
     teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
-    kunci = st.text_input("Kunci AES:", value="MySecretKey12345")
+    kunci = st.text_input("Kunci AES:", placeholder="Masukkan 16, 24, atau 32 karakter")
     encrypt_col, decrypt_col = st.columns(2)
     if encrypt_col.button("🔒 Enkripsi"):
-        cipher = AESCipher(kunci.encode())
-        save_result("aes_encrypt_result", cipher.aes_encrypt(teks))
+        try:
+            cipher = AESCipher(kunci.encode())
+            save_result("aes_encrypt_result", cipher.aes_encrypt(teks))
+        except ValueError as error:
+            st.error(str(error))
     if decrypt_col.button("🔓 Dekripsi"):
-        cipher = AESCipher(kunci.encode())
-        save_result("aes_decrypt_result", cipher.aes_decrypt(teks))
+        try:
+            cipher = AESCipher(kunci.encode())
+            save_result("aes_decrypt_result", cipher.aes_decrypt(teks))
+        except ValueError as error:
+            st.error(str(error))
 
     render_result(
         "aes_encrypt_result",
@@ -278,15 +313,32 @@ elif menu == "🌊 ChaCha20":
     teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
     kunci = st.text_input(
         "Key (Hex):",
-        value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        placeholder="Masukkan key 64 karakter hex",
     )
-    nonce = st.text_input("Nonce (Hex):", value="000000000000000000000000")
-    counter = st.number_input("Counter:", 0, 4294967295, 1)
+    nonce = st.text_input("Nonce (Hex):", placeholder="Masukkan nonce 24 karakter hex")
+    counter_input = st.number_input(
+        "Counter:",
+        min_value=0,
+        max_value=4294967295,
+        value=None,
+        step=1,
+        placeholder="Masukkan angka 0–4294967295",
+    )
     encrypt_col, decrypt_col = st.columns(2)
     if encrypt_col.button("🔒 Enkripsi"):
-        save_result("chacha_encrypt_result", chacha20_encrypt(teks, kunci, nonce, counter))
+        counter = parse_integer_input("Counter", counter_input, 0, 4294967295)
+        if counter is not None:
+            try:
+                save_result("chacha_encrypt_result", chacha20_encrypt(teks, kunci, nonce, counter))
+            except ValueError as error:
+                st.error(str(error))
     if decrypt_col.button("🔓 Dekripsi"):
-        save_result("chacha_decrypt_result", chacha20_decrypt(teks, kunci, nonce, counter))
+        counter = parse_integer_input("Counter", counter_input, 0, 4294967295)
+        if counter is not None:
+            try:
+                save_result("chacha_decrypt_result", chacha20_decrypt(teks, kunci, nonce, counter))
+            except ValueError as error:
+                st.error(str(error))
 
     render_result(
         "chacha_encrypt_result",
@@ -302,31 +354,52 @@ elif menu == "🌊 ChaCha20":
 elif menu == "🚀 Super Encryption":
     st.header("🚀 Super Encryption")
     teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
-    kunci_vig = st.text_input("Kunci Vigenère:", value="KEY")
-    kunci_aes = st.text_input("Kunci AES:", value="MySecretKey12345")
+    shift_input = st.number_input(
+        "Shift Caesar:",
+        min_value=1,
+        max_value=25,
+        value=None,
+        step=1,
+        placeholder="Masukkan angka 1–25",
+    )
+    kunci_vig = st.text_input("Kunci Vigenère:", placeholder="Masukkan kunci Vigenère")
+    kunci_aes = st.text_input("Kunci AES:", placeholder="Masukkan 16, 24, atau 32 karakter")
     kunci_chacha = st.text_input(
         "Key (Hex):",
-        value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        placeholder="Masukkan key 64 karakter hex",
     )
-    nonce_chacha = st.text_input("Nonce (Hex):", value="000000000000000000000000")
-    counter_chacha = st.number_input("Counter:", 0, 4294967295, 1)
+    nonce_chacha = st.text_input("Nonce (Hex):", placeholder="Masukkan nonce 24 karakter hex")
+    counter_input = st.number_input(
+        "Counter ChaCha20:",
+        min_value=0,
+        max_value=4294967295,
+        value=None,
+        step=1,
+        placeholder="Masukkan angka 0–4294967295",
+    )
 
     if st.button("🚀 Enkripsi Super"):
-        hasil_caesar, langkah_caesar = caesar_encrypt(teks, 3)
-        hasil_vig, langkah_vig = vigenere_encrypt(hasil_caesar, kunci_vig)
-        cipher = AESCipher(kunci_aes.encode())
-        hasil_aes, langkah_aes = cipher.aes_encrypt(hasil_vig)
-        hasil_chacha, langkah_chacha = chacha20_encrypt(
-            hasil_aes, kunci_chacha, nonce_chacha, counter_chacha
-        )
-        save_result(
-            "super_result",
-            {
-                "outputs": [teks, hasil_caesar, hasil_vig, hasil_aes, hasil_chacha],
-                "steps": [langkah_caesar, langkah_vig, langkah_aes, langkah_chacha],
-            },
-        )
-        st.session_state["super_stage"] = "Caesar"
+        shift = parse_integer_input("Shift Caesar", shift_input, 1, 25)
+        counter_chacha = parse_integer_input("Counter ChaCha20", counter_input, 0, 4294967295)
+        if shift is not None and counter_chacha is not None:
+            try:
+                hasil_caesar, langkah_caesar = caesar_encrypt(teks, shift)
+                hasil_vig, langkah_vig = vigenere_encrypt(hasil_caesar, kunci_vig)
+                cipher = AESCipher(kunci_aes.encode())
+                hasil_aes, langkah_aes = cipher.aes_encrypt(hasil_vig)
+                hasil_chacha, langkah_chacha = chacha20_encrypt(
+                    hasil_aes, kunci_chacha, nonce_chacha, counter_chacha
+                )
+                save_result(
+                    "super_result",
+                    {
+                        "outputs": [teks, hasil_caesar, hasil_vig, hasil_aes, hasil_chacha],
+                        "steps": [langkah_caesar, langkah_vig, langkah_aes, langkah_chacha],
+                    },
+                )
+                st.session_state["super_stage"] = "Caesar"
+            except ValueError as error:
+                st.error(str(error))
 
     if "super_result" in st.session_state:
         result = st.session_state["super_result"]
@@ -350,3 +423,5 @@ elif menu == "🚀 Super Encryption":
             stage_steps[selected_stage],
             f"super_{selected_stage.lower()}",
         )
+
+

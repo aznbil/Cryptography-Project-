@@ -1,472 +1,352 @@
-import streamlit as st
 import importlib
+import re
 
-# Import algoritma caesar
+import pandas as pd
+import streamlit as st
+
 from algorithm.algoritma_caesar import caesar_encrypt, caesar_decrypt
 
-# Import fungsi Vigenere menggunakan importlib (karena nama file mengandung tanda -)
 vigenere_module = importlib.import_module("algorithm.algoritma-Vigenere")
 vigenere_encrypt = vigenere_module.vigenere_encrypt
 vigenere_decrypt = vigenere_module.vigenere_decrypt
-
-# Import fungsi AES menggunakan importlib (karena nama file mengandung tanda -)
-# aes_encrypt = AESCipher.aes_encrypt
-# aes_decrypt = AESCipher.aes_decrypt
 aes_module = importlib.import_module("algorithm.algoritma-AES")
 AESCipher = aes_module.AESCipher
-
-
-# Import fungsi ChaCha20 menggunakan importlib (karena nama file mengandung tanda -)
 chacha_module = importlib.import_module("algorithm.algoritma-Chacha20")
 chacha20_encrypt = chacha_module.chacha20_encrypt
 chacha20_decrypt = chacha_module.chacha20_decrypt
 
-# Konfigurasi Halaman
-st.set_page_config(
-    page_title="Aplikasi Kriptografi",
-    page_icon="🔐",
-    layout="wide"
-)
+st.set_page_config(page_title="Kriptografi Interaktif", page_icon="🔐", layout="wide")
 
-# Sidebar Navigasi
-st.sidebar.title("🔐 Menu Kriptografi")
+
+def save_result(key, result):
+    st.session_state[key] = result
+    steps = result[1] if isinstance(result, tuple) else []
+    first_step = steps[0] if steps else ""
+    st.session_state[f"{key}_step"] = (
+        2 if isinstance(first_step, str) and first_step.startswith(("PROSES ", "===")) and len(steps) > 1 else 1
+    )
+
+
+def find_hex_step(steps, prefix):
+    for step in steps:
+        if isinstance(step, str) and step.startswith(prefix):
+            match = re.search(r":\s*([0-9a-fA-F]+)$", step)
+            if match:
+                return bytes.fromhex(match.group(1))
+    return None
+
+
+def render_byte_state(label, data):
+    cells = [f"{byte:02x}" for byte in data[:16]]
+    rows = [[cells[row + column * 4] for column in range(4)] for row in range(4)]
+    st.caption(label)
+    st.dataframe(
+        pd.DataFrame(rows, columns=["Kolom 0", "Kolom 1", "Kolom 2", "Kolom 3"]),
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def render_aes_cbc_simulation(steps, key):
+    is_encrypt = key.startswith("aes_encrypt") or key.startswith("super_aes")
+    if is_encrypt:
+        iv = find_hex_step(steps, "6. IV random")
+        data = find_hex_step(steps, "8. Plaintext setelah padding")
+        result = find_hex_step(steps, "10. Ciphertext hasil AES-CBC")
+    else:
+        iv = find_hex_step(steps, "4. IV (16 byte pertama)")
+        data = find_hex_step(steps, "5. Ciphertext")
+        result = find_hex_step(steps, "8. Hasil dekripsi sebelum unpadding")
+
+    if not iv or not data or not result:
+        return
+
+    st.markdown("#### 🔐 Visualisasi blok AES-CBC")
+    st.caption(
+        "Setiap blok AES berukuran 16 byte. Matriks menunjukkan byte dalam urutan kolom AES; "
+        "XOR dan CBC chain dihitung dari data proses ini. Implementasi AES memakai library "
+        "kriptografi yang tidak membuka state internal tiap round."
+    )
+    block_count = min(len(data), len(result)) // 16
+    for block_index in range(block_count):
+        start = block_index * 16
+        current_input = data[start:start + 16]
+        current_output = result[start:start + 16]
+        chain = iv if block_index == 0 else (
+            result[start - 16:start] if is_encrypt else data[start - 16:start]
+        )
+        xor_result = bytes(left ^ right for left, right in zip(current_input, chain))
+
+        with st.expander(f"Blok {block_index + 1} — {16} byte", expanded=block_index == 0):
+            if is_encrypt:
+                input_col, chain_col, xor_col, output_col = st.columns(4)
+                with input_col:
+                    render_byte_state("Plaintext blok", current_input)
+                with chain_col:
+                    render_byte_state("IV / ciphertext sebelumnya", chain)
+                with xor_col:
+                    render_byte_state("Hasil XOR sebelum AES", xor_result)
+                with output_col:
+                    render_byte_state("Output AES (ciphertext)", current_output)
+                st.markdown("**Plaintext → XOR dengan IV/ blok sebelumnya → AES → Ciphertext**")
+            else:
+                input_col, aes_col, chain_col, output_col = st.columns(4)
+                with input_col:
+                    render_byte_state("Ciphertext blok", current_input)
+                with aes_col:
+                    render_byte_state("Output AES decrypt", xor_result)
+                with chain_col:
+                    render_byte_state("IV / ciphertext sebelumnya", chain)
+                with output_col:
+                    render_byte_state("Plaintext setelah XOR", current_output)
+                st.markdown("**Ciphertext → AES decrypt → XOR dengan IV/ blok sebelumnya → Plaintext**")
+
+
+def render_step_visualization(title, steps, key):
+    if not steps:
+        st.info("Algoritma tidak menghasilkan langkah untuk ditampilkan.")
+        return
+
+    step_key = f"{key}_step"
+    if step_key not in st.session_state:
+        st.session_state[step_key] = 1
+    st.session_state[step_key] = min(st.session_state[step_key], len(steps))
+
+    st.markdown(f"### {title}")
+    previous_col, progress_col, next_col = st.columns([1, 4, 1])
+    if previous_col.button("← Sebelumnya", key=f"{step_key}_previous", disabled=st.session_state[step_key] <= 1):
+        st.session_state[step_key] -= 1
+    if next_col.button("Berikutnya →", key=f"{step_key}_next", disabled=st.session_state[step_key] >= len(steps)):
+        st.session_state[step_key] += 1
+    selected = st.session_state[step_key]
+    progress_col.progress(selected / len(steps), text=f"Langkah {selected} dari {len(steps)}")
+    step = steps[selected - 1]
+
+    if key.startswith("aes_") or key.startswith("super_aes"):
+        render_aes_cbc_simulation(steps, key)
+
+    with st.container(border=True):
+        if isinstance(step, dict):
+            st.caption(f"LANGKAH {step.get('No', selected)}")
+            input_value = step.get("Karakter Input", "-")
+            key_value = step.get("Kunci", "-")
+            output_value = step.get("Hasil", "-")
+            input_col, key_col, output_col = st.columns(3)
+            input_col.metric("Input", str(input_value))
+            key_col.metric("Karakter kunci", str(key_value))
+            output_col.metric("Hasil", str(output_value))
+            formula = step.get("Rumus Matematis")
+            if formula:
+                st.info(f"Operasi: `{formula}`")
+            with st.expander("Lihat nilai dan detail perhitungan"):
+                st.json(step)
+            return
+
+        lines = str(step).splitlines()
+        heading = lines[0] if lines else f"Langkah {selected}"
+        st.caption(heading.upper())
+
+        if heading.startswith("Karakter '") and "'" in heading[10:]:
+            parts = heading.split("'")
+            input_value = parts[1] if len(parts) > 1 else ""
+            output_value = heading.split("-> '", 1)[1].split("'", 1)[0] if "-> '" in heading else input_value
+            input_col, action_col, output_col = st.columns([2, 1, 2])
+            input_col.metric("Karakter masuk", input_value or "spasi")
+            action_col.markdown("<div style='text-align:center;padding-top:20px;font-size:24px'>→</div>", unsafe_allow_html=True)
+            output_col.metric("Karakter keluar", output_value or "spasi")
+
+        state_label = None
+        state_rows = []
+        detail_lines = []
+        for line in lines[1:]:
+            if line.endswith("State:") or line.endswith("state:"):
+                state_label = line.rstrip(":")
+                state_rows = []
+                continue
+            if state_label and "|" in line:
+                state_rows.append([word.strip() for word in line.split("|")])
+                continue
+            if state_rows and line.strip():
+                state_label = None
+            detail_lines.append(line)
+
+        if state_rows and all(len(row) == 4 for row in state_rows):
+            st.caption(state_label or "State 4 × 4")
+            st.dataframe(
+                pd.DataFrame(state_rows, columns=["Word 1", "Word 2", "Word 3", "Word 4"]),
+                hide_index=True,
+                width="stretch",
+            )
+            quarter_rounds = re.findall(r"\((\d+,\d+,\d+,\d+)\)", "\n".join(lines))
+            if quarter_rounds:
+                st.caption("Kelompok word yang diproses pada quarter-round ini")
+                st.code("   →   ".join(f"({group})" for group in quarter_rounds), language=None)
+        details = "\n".join(detail_lines).strip()
+        if details:
+            st.code(details, language=None)
+
+
+def render_result(result_key, output_label, visualization_title):
+    if result_key not in st.session_state:
+        return
+    output, steps = st.session_state[result_key]
+    st.success(output_label)
+    st.code(output, language=None)
+    render_step_visualization(visualization_title, steps, result_key)
+
+
 menu = st.sidebar.selectbox(
-    "Pilih Menu:",
-    (
-        "Beranda / Home",
-        "1. Algoritma Klasik 1 (Caesar Cipher)",
-        "2. Algoritma Klasik 2 (Vigenère Cipher)",
-        "3. Algoritma Modern 1 (AES)",
-        "4. Algoritma Modern 2 (ChaCha20)",
-        "5. Super Enkripsi (Gabungan)"
-    )
+    "📋 Pilih Menu:",
+    ("🏠 Beranda", "🔑 Caesar Cipher", "🔐 Vigenère Cipher", "⚙️ AES", "🌊 ChaCha20", "🚀 Super Encryption"),
 )
 
-# Konten Berdasarkan Menu
-if menu == "Beranda / Home":
-    st.title("Aplikasi Enkripsi & Dekripsi Kriptografi")
-    st.markdown("""
-    Selamat datang di aplikasi web tugas kelompok mata kuliah Kriptografi.
-    
-    ### Fitur Aplikasi:
-    - **Menu 1 & 2:** Algoritma Kriptografi Klasik
-    - **Menu 3 & 4:** Algoritma Kriptografi Modern
-    - **Menu 5:** Super Enkripsi (Gabungan 4 Algoritma)
-    - **Visualisasi Proses:** Menampilkan tahapan detail proses enkripsi & dekripsi.
-    
-    *Silakan pilih menu di sebelah kiri untuk mulai menggunakan aplikasi.*
-    """)
-    
-    st.info("💡 Jangan lupa untuk memperbarui informasi anggota kelompok di file README.md.")
+if menu == "🏠 Beranda":
+    st.title("🔐 Aplikasi Kriptografi Interaktif")
+    st.subheader("Simulasi Visual & Edukatif")
+    st.info("Pilih algoritma di sidebar untuk mencoba enkripsi/dekripsi dan menelusuri setiap langkahnya.")
 
-elif menu == "1. Algoritma Klasik 1 (Caesar Cipher)":
-    st.header("Menu 1: Caesar Cipher")
-    st.write("Algoritma substitusi klasik yang menggeser posisi huruf pada alfabet. Algoritma ini sangat rentan terhadap serangan Brute Force karena hanya memiliki 25 kemungkinan kunci.")
+elif menu == "🔑 Caesar Cipher":
+    st.header("🔑 Caesar Cipher")
+    teks = st.text_area("Masukkan teks:", placeholder="HELLO WORLD")
+    shift = st.number_input("Shift:", 1, 25, 3)
+    encrypt_col, decrypt_col = st.columns(2)
+    if encrypt_col.button("🔒 Enkripsi"):
+        save_result("caesar_encrypt_result", caesar_encrypt(teks, shift))
+    if decrypt_col.button("🔓 Dekripsi"):
+        save_result("caesar_decrypt_result", caesar_decrypt(teks, shift))
 
-    # Form Input dari user
-    teks = st.text_area("Masukkan Teks (Plaintext / Ciphertext):", height=100)
-    shift = st.number_input("Masukkan Kunci Pergeseran (Shift / N):", min_value=1, max_value=25, value=3)
-
-    # Membagi layout menjadi 3 kolom untuk tombol Encrypt, Decrypt, dan Brute Force
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True):
-            if teks:
-                hasil, langkah = caesar_encrypt(teks, shift)
-                st.success("Teks Berhasil Dienkripsi!")
-                st.text_input("Hasil Ciphertext:", value=hasil, disabled=True)
-
-                with st.expander("Tampilkan Langkah-langkah Enkripsi"):
-                    for step in langkah:
-                        st.write(f"- {step}")
-            else:
-                st.warning("Silakan masukkan teks terlebih dahulu.")
-
-    with col2:
-        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True):
-            if teks:
-                hasil, langkah = caesar_decrypt(teks, shift)
-                st.success("Teks Berhasil Didekripsi!")
-                st.text_input("Hasil Plaintext:", value=hasil, disabled=True)
-
-                with st.expander("Tampilkan Langkah-langkah Dekripsi"):
-                    for step in langkah:
-                        st.write(f"- {step}")
-            else:
-                st.warning("Silakan masukkan teks terlebih dahulu.")
-
-    with col3:
-        if st.button("🔍 Brute Force", use_container_width=True, type="primary"):
-            if teks:
-                st.warning("Menjalankan serangan Brute Force (menguji 25 kemungkinan kunci)...")
-
-                # Menggunakan expander yang langsung terbuka agar hasilnya rapi
-                with st.expander("Lihat Hasil Brute Force (Shift 1 - 25)", expanded=True):
-                    # Looping dari pergeseran 1 sampai 25
-                    for i in range(1, 26):
-                        # Kita abaikan variabel 'langkah' menggunakan underscore (_)
-                        # karena untuk brute force kita hanya butuh hasil akhirnya saja
-                        hasil_brute, _ = caesar_decrypt(teks, i)
-                        st.markdown(f"**Key {i}:** {hasil_brute}")
-            else:
-                st.warning("Silakan masukkan ciphertext terlebih dahulu.")
-
-elif menu == "2. Algoritma Klasik 2 (Vigenère Cipher)":
-    st.header("Menu 2: Vigenère Cipher")
-    st.write("Algoritma substitusi polialfabetik yang menggunakan kata kunci (*key*) untuk menggeser karakter. Setiap huruf pada pesan dienkripsi dengan pergeseran yang berbeda sesuai huruf kunci yang bersangkutan.")
-
-    teks_vigenere = st.text_area("Masukkan Teks (Plaintext / Ciphertext):", height=100, key="vigenere_text")
-    kunci_vigenere = st.text_input("Masukkan Kata Kunci (Key):", value="KEY", key="vigenere_key")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True, key="vigenere_enc_btn"):
-            if teks_vigenere and kunci_vigenere:
-                try:
-                    hasil, langkah = vigenere_encrypt(teks_vigenere, kunci_vigenere)
-                    st.success("Teks Berhasil Dienkripsi!")
-                    st.text_input("Hasil Ciphertext:", value=hasil, disabled=True, key="vigenere_res_enc")
-
-                    with st.expander("Tampilkan Langkah-langkah Enkripsi", expanded=True):
-                        st.dataframe(langkah, use_container_width=True)
-                except ValueError as e:
-                    st.error(str(e))
-            else:
-                st.warning("Silakan masukkan teks dan kata kunci terlebih dahulu.")
-
-    with col2:
-        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True, key="vigenere_dec_btn"):
-            if teks_vigenere and kunci_vigenere:
-                try:
-                    hasil, langkah = vigenere_decrypt(teks_vigenere, kunci_vigenere)
-                    st.success("Teks Berhasil Didekripsi!")
-                    st.text_input("Hasil Plaintext:", value=hasil, disabled=True, key="vigenere_res_dec")
-
-                    with st.expander("Tampilkan Langkah-langkah Dekripsi", expanded=True):
-                        st.dataframe(langkah, use_container_width=True)
-                except ValueError as e:
-                    st.error(str(e))
-            else:
-                st.warning("Silakan masukkan teks dan kata kunci terlebih dahulu.")
-
-elif menu == "3. Algoritma Modern 1 (AES)":
-
-    st.header("Menu 3: AES (Advanced Encryption Standard)")
-
-    st.write(
-        "Algoritma simetris block cipher modern menggunakan "
-        "mode CBC (Cipher Block Chaining) dan padding PKCS7."
+    render_result(
+        "caesar_encrypt_result",
+        "Hasil enkripsi:",
+        "🔄 Simulasi pergeseran maju",
+    )
+    render_result(
+        "caesar_decrypt_result",
+        "Hasil dekripsi:",
+        "🔄 Simulasi pergeseran balik",
     )
 
-    # =========================
-    # INPUT AES
-    # =========================
+elif menu == "🔐 Vigenère Cipher":
+    st.header("🔐 Vigenère Cipher")
+    teks = st.text_area("Masukkan teks:", placeholder="HELLO")
+    kunci = st.text_input("Kata Kunci:", value="KEY")
+    encrypt_col, decrypt_col = st.columns(2)
+    if encrypt_col.button("🔒 Enkripsi"):
+        save_result("vigenere_encrypt_result", vigenere_encrypt(teks, kunci))
+    if decrypt_col.button("🔓 Dekripsi"):
+        save_result("vigenere_decrypt_result", vigenere_decrypt(teks, kunci))
 
-    teks_aes = st.text_area(
-        "Masukkan Teks (Plaintext / Base64 Ciphertext):",
-        height=100,
-        key="aes_text"
+    for operation in ("encrypt", "decrypt"):
+        result_key = f"vigenere_{operation}_result"
+        if result_key in st.session_state:
+            output, steps = st.session_state[result_key]
+            st.success(f"Hasil {'enkripsi' if operation == 'encrypt' else 'dekripsi'}:")
+            st.code(output, language=None)
+            render_step_visualization(
+                f"📊 Simulasi karakter Vigenère — {operation.title()}",
+                steps,
+                result_key,
+            )
+            with st.expander("Lihat tabel seluruh karakter"):
+                st.dataframe(pd.DataFrame(steps), hide_index=True, width="stretch")
+
+elif menu == "⚙️ AES":
+    st.header("⚙️ AES")
+    teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
+    kunci = st.text_input("Kunci AES:", value="MySecretKey12345")
+    encrypt_col, decrypt_col = st.columns(2)
+    if encrypt_col.button("🔒 Enkripsi"):
+        cipher = AESCipher(kunci.encode())
+        save_result("aes_encrypt_result", cipher.aes_encrypt(teks))
+    if decrypt_col.button("🔓 Dekripsi"):
+        cipher = AESCipher(kunci.encode())
+        save_result("aes_decrypt_result", cipher.aes_decrypt(teks))
+
+    render_result(
+        "aes_encrypt_result",
+        "Hasil enkripsi:",
+        "🔄 Simulasi proses AES-CBC",
+    )
+    render_result(
+        "aes_decrypt_result",
+        "Hasil dekripsi:",
+        "🔄 Simulasi proses AES-CBC",
     )
 
-    kunci_aes = st.text_input(
-        "Masukkan Kunci AES:",
-        type="password",
-        help="Kunci harus memiliki panjang 16, 24, atau 32 byte.",
-        key="aes_key"
+elif menu == "🌊 ChaCha20":
+    st.header("🌊 ChaCha20")
+    teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
+    kunci = st.text_input(
+        "Key (Hex):",
+        value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    )
+    nonce = st.text_input("Nonce (Hex):", value="000000000000000000000000")
+    counter = st.number_input("Counter:", 0, 4294967295, 1)
+    encrypt_col, decrypt_col = st.columns(2)
+    if encrypt_col.button("🔒 Enkripsi"):
+        save_result("chacha_encrypt_result", chacha20_encrypt(teks, kunci, nonce, counter))
+    if decrypt_col.button("🔓 Dekripsi"):
+        save_result("chacha_decrypt_result", chacha20_decrypt(teks, kunci, nonce, counter))
+
+    render_result(
+        "chacha_encrypt_result",
+        "Hasil enkripsi:",
+        "🌊 Simulasi state dan operasi ChaCha20",
+    )
+    render_result(
+        "chacha_decrypt_result",
+        "Hasil dekripsi:",
+        "🌊 Simulasi state dan operasi ChaCha20",
     )
 
-    col1, col2 = st.columns(2)
+elif menu == "🚀 Super Encryption":
+    st.header("🚀 Super Encryption")
+    teks = st.text_area("Masukkan teks:", placeholder="SECRET MESSAGE")
+    kunci_vig = st.text_input("Kunci Vigenère:", value="KEY")
+    kunci_aes = st.text_input("Kunci AES:", value="MySecretKey12345")
+    kunci_chacha = st.text_input(
+        "Key (Hex):",
+        value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    )
+    nonce_chacha = st.text_input("Nonce (Hex):", value="000000000000000000000000")
+    counter_chacha = st.number_input("Counter:", 0, 4294967295, 1)
 
-    # =========================
-    # ENCRYPT
-    # =========================
+    if st.button("🚀 Enkripsi Super"):
+        hasil_caesar, langkah_caesar = caesar_encrypt(teks, 3)
+        hasil_vig, langkah_vig = vigenere_encrypt(hasil_caesar, kunci_vig)
+        cipher = AESCipher(kunci_aes.encode())
+        hasil_aes, langkah_aes = cipher.aes_encrypt(hasil_vig)
+        hasil_chacha, langkah_chacha = chacha20_encrypt(
+            hasil_aes, kunci_chacha, nonce_chacha, counter_chacha
+        )
+        save_result(
+            "super_result",
+            {
+                "outputs": [teks, hasil_caesar, hasil_vig, hasil_aes, hasil_chacha],
+                "steps": [langkah_caesar, langkah_vig, langkah_aes, langkah_chacha],
+            },
+        )
+        st.session_state["super_stage"] = "Caesar"
 
-    with col1:
+    if "super_result" in st.session_state:
+        result = st.session_state["super_result"]
+        output_labels = ["Plaintext", "Caesar", "Vigenère", "AES-CBC", "ChaCha20"]
+        st.markdown("### 🔗 Alur enkripsi")
+        pipeline_cols = st.columns(len(output_labels))
+        for column, label, output in zip(pipeline_cols, output_labels, result["outputs"]):
+            preview = output if len(output) <= 18 else f"{output[:15]}…"
+            column.metric(label, preview)
+        st.success("Hasil enkripsi super:")
+        st.code(result["outputs"][-1], language=None)
 
-        if st.button(
-            "🔒 Encrypt (Enkripsi)",
-            use_container_width=True,
-            key="aes_enc_btn"
-        ):
-
-            if teks_aes and kunci_aes:
-
-                try:
-
-                    # Convert key string -> bytes
-                    key_bytes = kunci_aes.encode("utf-8")
-
-                    # Validasi panjang key
-                    if len(key_bytes) not in [16, 24, 32]:
-
-                        st.error(
-                            f"Key harus 16, 24, atau 32 byte. "
-                            f"Key kamu sekarang {len(key_bytes)} byte."
-                        )
-
-                    else:
-
-                        # Buat object AES menggunakan key dari user
-                        cipher = AESCipher(key_bytes)
-
-                        # Encrypt
-                        hasil, langkah = cipher.aes_encrypt(
-                            teks_aes
-                        )
-
-                        st.success(
-                            "Teks berhasil dienkripsi dengan AES CBC!"
-                        )
-
-                        # =========================
-                        # OUTPUT CIPHERTEXT
-                        # =========================
-
-                        st.text_area(
-                            "Hasil Ciphertext (Base64):",
-                            value=hasil,
-                            height=100,
-                            key="aes_res_enc"
-                        )
-
-                        # =========================
-                        # OUTPUT LANGKAH
-                        # =========================
-
-                        with st.expander(
-                            "🔍 Tampilkan Langkah-Langkah Enkripsi AES",
-                            expanded=True
-                        ):
-
-                            for i, step in enumerate(langkah, start=1):
-
-                                st.write(
-                                    f"**Langkah {i}:** {step}"
-                                )
-
-                except Exception as e:
-
-                    st.error(
-                        f"Terjadi kesalahan: {str(e)}"
-                    )
-
-            else:
-
-                st.warning(
-                    "Silakan masukkan teks dan kunci terlebih dahulu."
-                )
-
-    # =========================
-    # DECRYPT
-    # =========================
-
-    with col2:
-
-        if st.button(
-            "🔓 Decrypt (Dekripsi)",
-            use_container_width=True,
-            key="aes_dec_btn"
-        ):
-
-            if teks_aes and kunci_aes:
-
-                try:
-
-                    # Convert key string -> bytes
-                    key_bytes = kunci_aes.encode("utf-8")
-
-                    # Validasi panjang key
-                    if len(key_bytes) not in [16, 24, 32]:
-
-                        st.error(
-                            f"Key harus 16, 24, atau 32 byte. "
-                            f"Key kamu sekarang {len(key_bytes)} byte."
-                        )
-
-                    else:
-
-                        # Buat object AES
-                        cipher = AESCipher(key_bytes)
-
-                        # Decrypt
-                        hasil, langkah = cipher.aes_decrypt(
-                            teks_aes
-                        )
-
-                        st.success(
-                            "Teks berhasil didekripsi dengan AES CBC!"
-                        )
-
-                        # =========================
-                        # OUTPUT PLAINTEXT
-                        # =========================
-
-                        st.text_area(
-                            "Hasil Plaintext:",
-                            value=hasil,
-                            height=100,
-                            key="aes_res_dec"
-                        )
-
-                        # =========================
-                        # OUTPUT LANGKAH
-                        # =========================
-
-                        with st.expander(
-                            "🔍 Tampilkan Langkah-Langkah Dekripsi AES",
-                            expanded=True
-                        ):
-
-                            for i, step in enumerate(langkah, start=1):
-
-                                st.write(
-                                    f"**Langkah {i}:** {step}"
-                                )
-
-                except Exception as e:
-
-                    st.error(
-                        f"Terjadi kesalahan: {str(e)}"
-                    )
-
-            else:
-
-                st.warning(
-                    "Silakan masukkan ciphertext Base64 dan kunci terlebih dahulu."
-                )
-
-elif menu == "4. Algoritma Modern 2 (ChaCha20)":
-    st.header("Menu 4: ChaCha20 Stream Cipher")
-    st.write("Algoritma kriptografi simetris tipe *stream cipher* modern yang sangat cepat dan aman. Menggunakan state matrix 4x4 (64 bytes) serta melakukan 20 putaran *quarter-round* (ARX: Addition, Rotation, XOR).")
-
-    teks_chacha = st.text_area("Masukkan Teks (Plaintext / Base64 Ciphertext):", height=100, key="chacha_text")
-    
-    col_k1, col_k2, col_k3 = st.columns(3)
-    with col_k1:
-        kunci_chacha = st.text_input("Kunci / Key (32 Byte / 64 Hex):", value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", key="chacha_key")
-    with col_k2:
-        nonce_chacha = st.text_input("Nonce (12 Byte / 24 Hex):", value="000000000000000000000000", key="chacha_nonce")
-    with col_k3:
-        counter_chacha = st.number_input("Counter Awal:", min_value=0, max_value=4294967295, value=1, key="chacha_counter")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("🔒 Encrypt (Enkripsi)", use_container_width=True, key="chacha_enc_btn"):
-            if teks_chacha and kunci_chacha and nonce_chacha:
-                try:
-                    hasil, langkah = chacha20_encrypt(teks_chacha, kunci_chacha, nonce_chacha, int(counter_chacha))
-                    st.success("Teks Berhasil Dienkripsi dengan ChaCha20!")
-                    st.text_area("Hasil Ciphertext (Base64):", value=hasil, height=100, key="chacha_res_enc")
-
-                    with st.expander("Tampilkan Detail Langkah State & Double Round ChaCha20", expanded=True):
-                        for step in langkah:
-                            if "\n" in step:
-                                st.text(step)
-                            else:
-                                st.write(f"- {step}")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan: {str(e)}")
-            else:
-                st.warning("Silakan masukkan teks, key, dan nonce terlebih dahulu.")
-
-    with col2:
-        if st.button("🔓 Decrypt (Dekripsi)", use_container_width=True, key="chacha_dec_btn"):
-            if teks_chacha and kunci_chacha and nonce_chacha:
-                try:
-                    hasil, langkah = chacha20_decrypt(teks_chacha, kunci_chacha, nonce_chacha, int(counter_chacha))
-                    st.success("Teks Berhasil Didekripsi dengan ChaCha20!")
-                    st.text_area("Hasil Plaintext:", value=hasil, height=100, key="chacha_res_dec")
-
-                    with st.expander("Tampilkan Detail Langkah State & Double Round ChaCha20", expanded=True):
-                        for step in langkah:
-                            if "\n" in step:
-                                st.text(step)
-                            else:
-                                st.write(f"- {step}")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan: {str(e)}")
-            else:
-                st.warning("Silakan masukkan ciphertext Base64, key, dan nonce terlebih dahulu.")
-
-elif menu == "5. Super Enkripsi (Gabungan)":
-    st.header("Menu 5: Super Enkripsi (Gabungan 4 Algoritma)")
-    st.write("Super Enkripsi ini menggabungkan 4 algoritma secara berturut-turut: **Caesar Cipher ➔ Vigenère Cipher ➔ AES ➔ ChaCha20** (Enkripsi) dan alur kebalikannya saat Dekripsi.")
-
-    teks_super = st.text_area("Masukkan Teks (Plaintext / Super Ciphertext):", height=100, key="super_text")
-
-    st.subheader("🔑 Konfigurasi Kunci & Parameter 4 Algoritma")
-    col_k1, col_k2 = st.columns(2)
-    with col_k1:
-        shift_super = st.number_input("1. Caesar Shift (N):", min_value=1, max_value=25, value=3, key="super_shift")
-        kunci_vigenere_super = st.text_input("2. Kunci Vigenère:", value="KEY", key="super_vig_key")
-        kunci_aes_super = st.text_input("3. Kunci AES:", value="MySecretKey123456", key="super_aes_key")
-    
-    with col_k2:
-        kunci_chacha_super = st.text_input("4a. Kunci ChaCha20 (64 Hex):", value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", key="super_chacha_key")
-        nonce_chacha_super = st.text_input("4b. Nonce ChaCha20 (24 Hex):", value="000000000000000000000000", key="super_chacha_nonce")
-        counter_chacha_super = st.number_input("4c. Counter ChaCha20:", min_value=0, max_value=4294967295, value=1, key="super_chacha_counter")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("🔒 Super Encrypt (Enkripsi 4 Tahap)", use_container_width=True, type="primary", key="super_enc_btn"):
-            if teks_super:
-                try:
-                    aes_cipher = AESCipher(
-                    kunci_aes_super.encode("utf-8")
-                    )
-                    # 1. Caesar Encrypt
-                    t1, _ = caesar_encrypt(teks_super, shift_super)
-                    # 2. Vigenere Encrypt
-                    t2, _ = vigenere_encrypt(t1, kunci_vigenere_super)
-                    # 3. AES Encrypt
-                    t3, _ = aes_cipher.aes_encrypt(t2)
-                    # 4. ChaCha20 Encrypt
-                    final_ciphertext, _ = chacha20_encrypt(t3, kunci_chacha_super, nonce_chacha_super, int(counter_chacha_super))
-
-                    st.success("Super Enkripsi 4 Tahap Berhasil Selesai!")
-                    st.text_area("Hasil Super Ciphertext (Final Base64):", value=final_ciphertext, height=120, key="super_res_enc")
-
-                    with st.expander("Lihat Alur Hasil Setiap Tahap (Caesar ➔ Vigenère ➔ AES ➔ ChaCha20)", expanded=True):
-                        st.markdown(f"**Plaintext Awal:** `{teks_super}`")
-                        st.markdown(f"**Tahap 1 (Caesar Cipher):** `{t1}`")
-                        st.markdown(f"**Tahap 2 (Vigenère Cipher):** `{t2}`")
-                        st.markdown(f"**Tahap 3 (AES CBC Base64):** `{t3}`")
-                        st.markdown(f"**Tahap 4 (ChaCha20 Final Base64):** `{final_ciphertext}`")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan pada Super Enkripsi: {str(e)}")
-            else:
-                st.warning("Silakan masukkan teks terlebih dahulu.")
-
-    with col2:
-        if st.button("🔓 Super Decrypt (Dekripsi 4 Tahap)", use_container_width=True, key="super_dec_btn"):
-            if teks_super:
-                try:
-                    aes_cipher = AESCipher(
-                    kunci_aes_super.encode("utf-8")
-                    )
-                    # 1. ChaCha20 Decrypt
-                    d3, _ = chacha20_decrypt(teks_super, kunci_chacha_super, nonce_chacha_super, int(counter_chacha_super))
-                    # 2. AES Decrypt
-                    d2, _ =  aes_cipher.aes_decrypt(d3)
-                    # 3. Vigenere Decrypt
-                    d1, _ = vigenere_decrypt(d2, kunci_vigenere_super)
-                    # 4. Caesar Decrypt
-                    original_plaintext, _ = caesar_decrypt(d1, shift_super)
-
-                    st.success("Super Dekripsi 4 Tahap Berhasil Selesai!")
-                    st.text_area("Hasil Plaintext Asli:", value=original_plaintext, height=120, key="super_res_dec")
-
-                    with st.expander("Lihat Alur Dekripsi Setiap Tahap (ChaCha20 ➔ AES ➔ Vigenère ➔ Caesar)", expanded=True):
-                        st.markdown(f"**Super Ciphertext Input:** `{teks_super}`")
-                        st.markdown(f"**Tahap 1 Dekripsi (ChaCha20 ➔ AES Base64):** `{d3}`")
-                        st.markdown(f"**Tahap 2 Dekripsi (AES ➔ Vigenère Text):** `{d2}`")
-                        st.markdown(f"**Tahap 3 Dekripsi (Vigenère ➔ Caesar Text):** `{d1}`")
-                        st.markdown(f"**Tahap 4 Dekripsi (Caesar ➔ Plaintext Asli):** `{original_plaintext}`")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan pada Super Dekripsi: {str(e)}")
-            else:
-                st.warning("Silakan masukkan super ciphertext terlebih dahulu.")
+        stage_steps = dict(zip(output_labels[1:], result["steps"]))
+        selected_stage = st.selectbox(
+            "Pilih tahap untuk ditelusuri:",
+            list(stage_steps),
+            key="super_stage",
+        )
+        render_step_visualization(
+            f"Langkah {selected_stage}",
+            stage_steps[selected_stage],
+            f"super_{selected_stage.lower()}",
+        )

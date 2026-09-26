@@ -9,6 +9,8 @@ Aplikasi web berbasis Python menggunakan **Streamlit** untuk melakukan enkripsi 
 4. **Algoritma Modern 2** (Chacha20)
 5. **Super Enkripsi** (Gabungan berurutan dari 4 algoritma di atas)
 
+Setelah menjalankan enkripsi atau dekripsi, gunakan tombol **“Sebelumnya”** dan **“Berikutnya”** untuk menelusuri proses tanpa kehilangan hasil. Vigenère menampilkan perhitungan tiap karakter, AES memperlihatkan susunan byte dan rantai XOR per blok CBC, ChaCha20 menampilkan state 4×4 beserta kelompok quarter-round, dan Super Encryption menyediakan alur serta pilihan tahap yang dapat ditelusuri.
+
 ---
 
 ## Anggota Kelompok
